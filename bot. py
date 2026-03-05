@@ -1,0 +1,45 @@
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from config import API_ID, API_HASH, BOT_TOKEN
+
+bot = Client(
+    "komi_bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN
+)
+
+@bot.on_message(filters.command("start"))
+async def start(client, message: Message):
+
+    if len(message.command) > 1:
+        file_id = message.command[1]
+        await message.reply_document(file_id)
+    else:
+        await message.reply_text(
+            "👋 Welcome!\n\nSend me any file and I will generate a shareable link."
+        )
+
+
+@bot.on_message(filters.private & (filters.document | filters.video | filters.audio))
+async def get_link(client, message: Message):
+
+    file_id = None
+
+    if message.document:
+        file_id = message.document.file_id
+
+    elif message.video:
+        file_id = message.video.file_id
+
+    elif message.audio:
+        file_id = message.audio.file_id
+
+    link = f"https://t.me/Komi_link_Provider_bot?start={file_id}"
+
+    await message.reply_text(
+        f"🔗 Your Link:\n{link}"
+    )
+
+
+bot.run()
