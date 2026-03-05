@@ -1,45 +1,77 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message
-from config import API_ID, API_HASH, BOT_TOKEN
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import config
 
 bot = Client(
-    "komi_bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+    "KomiBot",
+    api_id=config.API_ID,
+    api_hash=config.API_HASH,
+    bot_token=config.BOT_TOKEN
+)
+
+START_BUTTONS = InlineKeyboardMarkup(
+    [
+        [
+            InlineKeyboardButton("🔗 Short Link", callback_data="shortlink"),
+            InlineKeyboardButton("📖 Tutorial", callback_data="tutorial")
+        ],
+        [
+            InlineKeyboardButton("💰 Premium", callback_data="premium")
+        ]
+    ]
 )
 
 @bot.on_message(filters.command("start"))
-async def start(client, message: Message):
+async def start(client, message):
 
-    if len(message.command) > 1:
-        file_id = message.command[1]
-        await message.reply_document(file_id)
-    else:
-        await message.reply_text(
-            "👋 Welcome!\n\nSend me any file and I will generate a shareable link."
-        )
+    text = f"""
+👋 Welcome to **Komi Link Provider Bot**
 
+Send me any link and I will convert it into a **short link**.
 
-@bot.on_message(filters.private & (filters.document | filters.video | filters.audio))
-async def get_link(client, message: Message):
+⚡ Fast
+🔒 Secure
+🚀 Unlimited
 
-    file_id = None
+Created for easy link sharing.
+"""
 
-    if message.document:
-        file_id = message.document.file_id
-
-    elif message.video:
-        file_id = message.video.file_id
-
-    elif message.audio:
-        file_id = message.audio.file_id
-
-    link = f"https://t.me/Komi_link_Provider_bot?start={file_id}"
-
-    await message.reply_text(
-        f"🔗 Your Link:\n{link}"
+    await message.reply_photo(
+        photo=config.START_PIC,
+        caption=text,
+        reply_markup=START_BUTTONS
     )
 
+@bot.on_callback_query(filters.regex("shortlink"))
+async def shortlink(client, query):
+
+    await query.message.reply_text(
+        "📩 Send your link now.\n\nExample:\nhttps://google.com"
+    )
+
+@bot.on_callback_query(filters.regex("tutorial"))
+async def tutorial(client, query):
+
+    await query.message.reply_text(
+        "📖 Tutorial:\n\n1️⃣ Click Short Link\n2️⃣ Send your URL\n3️⃣ Get shortened link"
+    )
+
+@bot.on_callback_query(filters.regex("premium"))
+async def premium(client, query):
+
+    await query.message.reply_text(
+        "💰 Premium Features:\n\n• Faster links\n• Custom domain\n• No limits\n\nContact admin."
+    )
+
+@bot.on_message(filters.text & ~filters.command(["start"]))
+async def shortener(client, message):
+
+    link = message.text
+
+    short = f"https://{config.BOT_USERNAME}.xyz/{message.id}"
+
+    await message.reply_text(
+        f"✅ Your Short Link:\n\n{short}"
+    )
 
 bot.run()
