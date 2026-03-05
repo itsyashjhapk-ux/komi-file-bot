@@ -1,77 +1,107 @@
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import requests
+import base64
+import urllib.parse
 import config
 
+VERCEL_DOMAIN = "https://heavenverse.vercel.app"
+START_PIC = "https://i.ibb.co/YTLtj7r2/d43eb18b6542.jpg"
+
 bot = Client(
-    "KomiBot",
+    "komi_shortener_bot",
     api_id=config.API_ID,
     api_hash=config.API_HASH,
     bot_token=config.BOT_TOKEN
 )
 
-START_BUTTONS = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("🔗 Short Link", callback_data="shortlink"),
-            InlineKeyboardButton("📖 Tutorial", callback_data="tutorial")
-        ],
-        [
-            InlineKeyboardButton("💰 Premium", callback_data="premium")
-        ]
-    ]
-)
+# ---------------- FORCE SUB CHECK ---------------- #
+
+async def check_force_sub(client, user_id):
+    for channel in config.FORCE_SUB_CHANNELS:
+        try:
+            member = await client.get_chat_member(channel, user_id)
+            if member.status in ["left", "kicked"]:
+                return False
+        except:
+            return False
+    return True
+
+
+# ---------------- START COMMAND ---------------- #
 
 @bot.on_message(filters.command("start"))
 async def start(client, message):
 
-    text = f"""
+    text = """
 👋 Welcome to **Komi Link Provider Bot**
 
-Send me any link and I will convert it into a **short link**.
+🔒 Secure Links  
+💰 Ad Protected Links  
+⚡ Instant Link Generator
 
-⚡ Fast
-🔒 Secure
-🚀 Unlimited
-
-Created for easy link sharing.
+Send any link to shorten it.
 """
 
     await message.reply_photo(
-        photo=config.START_PIC,
-        caption=text,
-        reply_markup=START_BUTTONS
+        photo=START_PIC,
+        caption=text
     )
 
-@bot.on_callback_query(filters.regex("shortlink"))
-async def shortlink(client, query):
 
-    await query.message.reply_text(
-        "📩 Send your link now.\n\nExample:\nhttps://google.com"
-    )
-
-@bot.on_callback_query(filters.regex("tutorial"))
-async def tutorial(client, query):
-
-    await query.message.reply_text(
-        "📖 Tutorial:\n\n1️⃣ Click Short Link\n2️⃣ Send your URL\n3️⃣ Get shortened link"
-    )
-
-@bot.on_callback_query(filters.regex("premium"))
-async def premium(client, query):
-
-    await query.message.reply_text(
-        "💰 Premium Features:\n\n• Faster links\n• Custom domain\n• No limits\n\nContact admin."
-    )
+# ---------------- SHORTENER ---------------- #
 
 @bot.on_message(filters.text & ~filters.command(["start"]))
-async def shortener(client, message):
+async def shorten_link(client, message):
 
-    link = message.text
+    user_id = message.from_user.id
 
-    short = f"https://{config.BOT_USERNAME}.xyz/{message.id}"
+    subscribed = await check_force_sub(client, user_id)
 
-    await message.reply_text(
-        f"✅ Your Short Link:\n\n{short}"
-    )
+    if not subscribed:
+
+        buttons = ""
+
+        for ch in config.FORCE_SUB_CHANNELS:
+            buttons += f"{ch}\n"
+
+        await message.reply_text(
+            f"⚠️ You must join all channels first:\n\n{buttons}"
+        )
+        return
+
+    original_link = message.text.strip()
+
+    try:
+
+        encoded_link = base64.urlsafe_b64encode(original_link.encode()).decode()
+
+        protected_link = f"{VERCEL_DOMAIN}/?url={encoded_link}"
+
+        api_url = (
+            f"https://linkshortify.com/api"
+            f"?api={config.SHORTENER_API}"
+            f"&url={urllib.parse.quote(protected_link)}"
+        )
+
+        response = requests.get(api_url).json()
+
+        if response["status"] == "success":
+
+            short_link = response["shortenedUrl"]
+
+            await message.reply_text(
+                f"✅ **Your Protected Link**\n\n{short_link}\n\n"
+                f"🔒 Vercel Protected\n"
+                f"💰 Ad Monetized"
+            )
+
+        else:
+            await message.reply_text("❌ Failed to shorten the link.")
+
+    except:
+        await message.reply_text("⚠️ Error processing link.")
+
+
+print("Bot Started Successfully")
 
 bot.run()
